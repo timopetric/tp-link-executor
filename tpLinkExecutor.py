@@ -16,8 +16,6 @@ def getAuth(username, password):
 	import base64
 	return base64.b64encode(username+":"+password)
 
-urlReboot = "http://"+LOCAL_IP+"/userRpm/SysRebootRpm.htm?Reboot=Reboot"
-
 def getConnectedDevicesList():
 	urlDevices = "http://"+LOCAL_IP+"/userRpm/AssignedIpAddrListRpm.htm?Refresh=Refresh"
 	todayDateStr = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S") # today date in the uniform format
@@ -47,13 +45,39 @@ def getConnectedDevicesList():
 		logger.debug("DEVICE NAME: {}, MAC ADDR: {}, IP: {}, LEASE TIME: {}".format(name, macAddr, ipAddr, leaseTime))
 	return devicesList
 
+def reboot():
+	urlReboot = "http://"+LOCAL_IP+"/userRpm/SysRebootRpm.htm?Reboot=Reboot"
+	todayDateStr = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S") # today date in the uniform format
+
+	if len(AUTH) < 1:
+		logger.error("Unset AUTH key. Set it in the config file or use the getAuth() function in place of \"AUTH\" fields in the main program.")
+		sys.exit(1)
+
+	resp = requests.get(urlReboot, headers={"Authorization" : "Basic "+AUTH, "Referer": "http://"+LOCAL_IP+"/userRpm/SysRebootRpm.htm"})
+	if "Please wait a moment, if the browser does not refresh automatically" in resp.text:
+		logger.info("Rebooted the device.")
+	else:
+		logger.error("Could not reboot the device.")
+
 
 if __name__ == "__main__":
+	rebootBool = False
+	getDeviceListBool = False
+	if len(sys.argv) >= 2:
+		if "-R" in sys.argv[1:]:
+			rebootBool = True
+		if "-D" in sys.argv[1:]:
+			getDeviceListBool = True
 	try:
-		sqlBase = dbExecutor()
-		for dev in getConnectedDevicesList():
-			sqlBase.insertOne(dev)
-
+		if getDeviceListBool:
+			sqlBase = dbExecutor()
+			for dev in getConnectedDevicesList():
+				sqlBase.insertOne(dev)
+		if rebootBool:
+			reboot()
+		if not getDeviceListBool and not rebootBool:
+			logger.info("No arguments provided.")
+			
 	except Exception:
 		logger.exception("")
 		sys.exit(1)
